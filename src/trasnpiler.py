@@ -19,8 +19,9 @@ class VCPToCircuitTranspiler:
         
     @staticmethod
     def calc_iterations(n, k) -> int:
-        N = 2 ** n
+        N = math.pow(2, n) # number of possible inputs
         M = math.comb(n, k) # over approximate the number of solutions to avoid overshooting the number of iterations
+        # M = 1
         return math.floor(math.pi / 4 * math.sqrt(N / M))
 
     def decrement(self, qc: QuantumCircuit, counting_bits: list[int]):
@@ -97,7 +98,7 @@ class VCPToCircuitTranspiler:
             qc.x(v)
             
     def reset_counting_qubits(self, qc: QuantumCircuit):
-        for i in range(self.num_vertices):
+        for i in range(self.num_vertices)[::-1]:
             self.zero_bounded_decrementer(qc, i)
 
     def phase_kickback(self, qc: QuantumCircuit):
@@ -107,7 +108,6 @@ class VCPToCircuitTranspiler:
         flip_qubits = [i + self.num_vertices + 1 for i, bit in enumerate(target_count_bits) if bit == '0']
         for qubit in flip_qubits:
             qc.x(qubit)
-            
         
         num_control_qubits = self.num_counting_qubits + self.num_edges
         control_qubits = list(range(self.num_qubits - num_control_qubits - 1, self.num_qubits - 1)) # counting qubits + edge qubits
@@ -152,7 +152,8 @@ class VCPToCircuitTranspiler:
         qc.x(self.num_qubits - 1) 
         qc.h(self.num_qubits - 1) 
          
-        for _ in range(1):
+        print(f"Number of iterations: {self.iterations}")
+        for _ in range(self.iterations):
             self.oracle(qc)
             self.diffusion(qc)
             
@@ -172,9 +173,11 @@ if __name__ == "__main__":
     import qiskit.qasm3
     from problem import Graph
     
-    #graph = Graph(vertices=[0,1,2], edges=[(0,1), (0,2), (1,2)])
-    # graph = Graph(vertices=[0,1,2,3,4,5], edges=[(0,1), (0,2), (1,2), (1,3), (1,4), (1,5)])
-    graph = Graph(vertices=[0,1,2,3], edges=[(0,1), (0,2), (1,2), (1,3)])
+    # graph = Graph(vertices=[0,1,2], edges=[(0,1), (0,2), (1,2)])
+    #graph = Graph(vertices=[0,1,2,3,4,5], edges=[(0,1), (0,2), (1,2), (1,3), (1,4), (1,5)])
+    graph = Graph(vertices=[0,1,2,3,4], edges=[(0,1), (0,2), (1,2), (1,3), (1,4)])
+    # graph = Graph(vertices=[0,1,2,3], edges=[(0,1), (0,2), (1,2), (1,3)])
+    # graph = Graph(vertices=[0,1,2,3,4], edges=[(0,1), (0,2), (1,2), (1,3), (3,4)])
     problem = VertexCoverProblem(graph=graph, k=2)
     
     transpiler = VCPToCircuitTranspiler(problem)
@@ -186,7 +189,7 @@ if __name__ == "__main__":
     sim = AerSimulator()
 
     tqc = transpile(qc, backend=sim, optimization_level=3)
-    job = sim.run(tqc, shots=2000)
+    job = sim.run(tqc, shots=1000)
     result = job.result()
     counts = result.get_counts()
     print(counts)
