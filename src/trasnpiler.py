@@ -1,0 +1,202 @@
+from qiskit import QuantumCircuit
+from problem import VertexCoverProblem
+import math
+import numpy as np
+from qiskit.circuit.library import MCXGate
+
+
+class VCPToCircuitTranspiler:
+    def __init__(self, problem: VertexCoverProblem):
+        self.edges = problem.graph.edges
+        
+        self.num_vertices = len(problem.graph.vertices)
+        self.num_edges = len(problem.graph.edges)
+        self.k = problem.k
+        self.num_counting_qubits = len(bin(self.k + 2)[2:]) # number of bits needed to represent k + 2, which is the bound for the incrementer
+        
+        self.iterations = self.calc_iterations(self.num_vertices, problem.k)
+        self.num_qubits = self.num_vertices + 1 + self.num_counting_qubits + self.num_edges + 1 # value qubits + ancilla + counting qubits + edge qubits + phase kickback qubit
+        
+    @staticmethod
+    def calc_iterations(n, k) -> int:
+        N = 2 ** n
+        M = math.comb(n, k) # over approximate the number of solutions to avoid overshooting the number of iterations
+        return math.floor(math.pi / 4 * math.sqrt(N / M))
+
+    def decrement(self, qc: QuantumCircuit, counting_bits: list[int]):
+        for i in range(len(counting_bits)):
+            qc.append(MCXGate(i+1),  [self.num_vertices] + counting_bits[:i+1])
+    
+    def increment(self, qc: QuantumCircuit, counting_bits: list[int]):
+        for i in range(len(counting_bits)):
+            qc.append(MCXGate(len(counting_bits)-i), [self.num_vertices] + counting_bits[:len(counting_bits)-i])
+    
+    def check_bound(self, qc: QuantumCircuit, counting_qbits: list[int], trigger_bits: list[int]):
+            indexes = [i for i, bit in enumerate(trigger_bits) if bit == 1]
+            qc.append(MCXGate(len(indexes)), [counting_qbits[i] for i in indexes] + [self.num_vertices])
+            
+    def zero_bounded_decrementer(self, qc, control: int):
+        trigger_bits = [1] * self.num_counting_qubits # trigger when all counting bellow 0, i.e max value of counter is reached
+        counting_qbits = list(range(self.num_vertices + 1, len(trigger_bits) + self.num_vertices + 1))
+    
+        qc.cx(control, self.num_vertices)
+        self.decrement(qc, counting_qbits)
+        qc.cx(control, self.num_vertices)
+        qc.barrier()
+        self.check_bound(qc, counting_qbits, trigger_bits)
+        qc.barrier()
+        self.increment(qc, counting_qbits)        
+        qc.reset(self.num_vertices)
+        
+    
+    def n_bounded_incrementer(self, qc, control: int, bound: int):
+        trigger_int = bound + 1
+        trigger_bits = [int(x) for x in bin(trigger_int)[2:]][::-1]
+        
+        counting_qbits = list(range(self.num_vertices + 1, len(trigger_bits) + self.num_vertices + 1))
+    
+        qc.cx(control, self.num_vertices)
+        self.increment(qc, counting_qbits)
+        qc.cx(control, self.num_vertices)
+        qc.barrier()
+        self.check_bound(qc, counting_qbits, trigger_bits)
+        qc.barrier()
+        self.decrement(qc, counting_qbits)        
+        qc.reset(self.num_vertices)
+    
+    def count_constraint(self, qc: QuantumCircuit):
+        for i in range(self.num_vertices):
+            self.n_bounded_incrementer(qc, i, self.k + 1)
+
+    def edge_constraint(self, qc: QuantumCircuit):
+        vertecies = set()
+        for v1, v2 in self.edges:
+            vertecies.add(v1)
+            vertecies.add(v2)
+        
+        # set all connected vertecies to 1, so that the counting qubits are only incremented if the edge is not covered
+        for v in vertecies:
+            qc.x(v)
+        
+        for i, (v1, v2) in enumerate(self.edges):
+            qc.ccx(v1, v2, self.num_vertices + 1 + self.num_counting_qubits + i)
+            qc.x(self.num_vertices + 1 + self.num_counting_qubits + i)
+
+    def reset_edge_qubits(self, qc: QuantumCircuit):
+        for i, (v1, v2) in enumerate(self.edges):
+            qc.x(self.num_vertices + 1 + self.num_counting_qubits + i)
+            qc.ccx(v1, v2, self.num_vertices + 1 + self.num_counting_qubits + i)
+        
+        # reset all connected vertecies back to 0
+        vertecies = set()
+        for v1, v2 in self.edges:
+            vertecies.add(v1)
+            vertecies.add(v2)
+        
+        for v in vertecies:
+            qc.x(v)
+            
+    def reset_counting_qubits(self, qc: QuantumCircuit):
+        for i in range(self.num_vertices):
+            self.zero_bounded_decrementer(qc, i)
+
+    def phase_kickback(self, qc: QuantumCircuit):
+        target_count_bits = bin(self.k)[2:][::-1] # get binary representation of k and reverse it to match the order of counting qubits
+        target_count_bits += '0' * (self.num_counting_qubits - len(target_count_bits))
+
+        flip_qubits = [i + self.num_vertices + 1 for i, bit in enumerate(target_count_bits) if bit == '0']
+        for qubit in flip_qubits:
+            qc.x(qubit)
+            
+        
+        num_control_qubits = self.num_counting_qubits + self.num_edges
+        control_qubits = list(range(self.num_qubits - num_control_qubits - 1, self.num_qubits - 1)) # counting qubits + edge qubits
+        qc.append(MCXGate(num_control_qubits), control_qubits + [self.num_qubits - 1])
+        
+        # reset flipped qubits
+        for qubit in flip_qubits:
+            qc.x(qubit)
+        
+    def oracle(self, qc: QuantumCircuit):
+        qc.barrier()
+        self.count_constraint(qc)
+        qc.barrier()
+        self.edge_constraint(qc)
+        qc.barrier()
+        self.phase_kickback(qc)
+        qc.barrier()
+        self.reset_edge_qubits(qc)
+        qc.barrier()
+        self.reset_counting_qubits(qc)
+        qc.barrier()
+        
+    def diffusion(self, qc: QuantumCircuit):
+        for i in range(self.num_vertices):
+            qc.h(i)
+            qc.x(i)
+        
+        qc.h(self.num_vertices - 1)
+        vertex_qubits = list(range(self.num_vertices))
+        qc.append(MCXGate(self.num_vertices - 1), vertex_qubits)
+        qc.h(self.num_vertices - 1)
+        
+        for i in range(self.num_vertices):
+            qc.x(i)
+            qc.h(i)
+
+    def transpile(self) -> QuantumCircuit:
+        qc = QuantumCircuit(self.num_qubits, self.num_vertices) 
+        qc.h(range(self.num_vertices)) # superposition of all vertex subsets
+        
+        # Prepare phase kickback qubit
+        qc.x(self.num_qubits - 1) 
+        qc.h(self.num_qubits - 1) 
+         
+        for _ in range(1):
+            self.oracle(qc)
+            self.diffusion(qc)
+            
+        measure_qubits = list(range(self.num_vertices))
+        qc.measure(measure_qubits, measure_qubits)
+        return qc
+    
+
+if __name__ == "__main__":
+    from matplotlib import pyplot as plt
+    from qiskit import QuantumCircuit, transpile
+    from qiskit_ibm_runtime import QiskitRuntimeService, Session, SamplerV2
+    from qiskit_aer import AerSimulator
+    from qiskit_aer.noise import NoiseModel
+    from qiskit.circuit.library import C3XGate, MCXGate
+    from qiskit.visualization import plot_histogram
+    import qiskit.qasm3
+    from problem import Graph
+    
+    #graph = Graph(vertices=[0,1,2], edges=[(0,1), (0,2), (1,2)])
+    # graph = Graph(vertices=[0,1,2,3,4,5], edges=[(0,1), (0,2), (1,2), (1,3), (1,4), (1,5)])
+    graph = Graph(vertices=[0,1,2,3], edges=[(0,1), (0,2), (1,2), (1,3)])
+    problem = VertexCoverProblem(graph=graph, k=2)
+    
+    transpiler = VCPToCircuitTranspiler(problem)
+    qc = transpiler.transpile()
+    
+    print(qc)
+    service = QiskitRuntimeService(channel="ibm_quantum_platform")
+    backend = service.backend("ibm_fez")
+    sim = AerSimulator()
+
+    tqc = transpile(qc, backend=sim, optimization_level=3)
+    job = sim.run(tqc, shots=2000)
+    result = job.result()
+    counts = result.get_counts()
+    print(counts)
+
+    # Option 1: Save to image file
+    plot_histogram(counts)
+    plt.savefig("histogram.png", dpi=150, bbox_inches="tight")
+    print("Saved to histogram.png")
+
+    
+
+        
+    
