@@ -173,9 +173,9 @@ if __name__ == "__main__":
     import qiskit.qasm3
     from problem import Graph
     
-    # graph = Graph(vertices=[0,1,2], edges=[(0,1), (0,2), (1,2)])
+    graph = Graph(vertices=[0,1,2], edges=[(0,1), (0,2), (1,2)])
     #graph = Graph(vertices=[0,1,2,3,4,5], edges=[(0,1), (0,2), (1,2), (1,3), (1,4), (1,5)])
-    graph = Graph(vertices=[0,1,2,3,4], edges=[(0,1), (0,2), (1,2), (1,3), (1,4)])
+    #graph = Graph(vertices=[0,1,2,3,4], edges=[(0,1), (0,2), (1,2), (1,3), (1,4)])
     # graph = Graph(vertices=[0,1,2,3], edges=[(0,1), (0,2), (1,2), (1,3)])
     # graph = Graph(vertices=[0,1,2,3,4], edges=[(0,1), (0,2), (1,2), (1,3), (3,4)])
     problem = VertexCoverProblem(graph=graph, k=2)

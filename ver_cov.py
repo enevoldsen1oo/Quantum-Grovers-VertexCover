@@ -5,7 +5,7 @@ from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel
 from qiskit.circuit.library import C3XGate, MCXGate
 from qiskit.visualization import plot_histogram
-from math import sqrt, pi, floor, ceil
+from math import sqrt, pi, floor, comb
 import qiskit.qasm3
 
 ancilla = QuantumRegister(1, 'anc')
@@ -47,66 +47,64 @@ def oracle(qc):
     for i in range(4,7):
         counter(qc, i)
     
+    qc.barrier()
     #Affected vertexes from e1
-    qc.x([5,6])
+    qc.x([4,5,6])
+
     qc.ccx(5, 6, 7)
     qc.x(7)
-    qc.x([5,6])
 
     # Affected vertexes from e2
-    qc.x([4,6])
     qc.ccx(4, 6, 8)
     qc.x(8)
-    qc.x([4,6])
 
     # Affected vertexes from e3
-    qc.x([4,5])
     qc.ccx(4, 5, 9)
     qc.x(9)
-    qc.x([4,5])
 
+    qc.barrier()
     # Phase kickback
     qc.x(1)
     qc.append(MCXGate(5), [1, 2, 7, 8, 9, 10])
     qc.x(1)
-
+    qc.barrier()
     # Reverse system    
-    qc.x([4,5])
     qc.x(9)
     qc.ccx(4, 5, 9)
-    qc.x([4,5])
 
-    qc.x([4,6])
     qc.x(8)
     qc.ccx(4, 6, 8)
-    qc.x([4,6])
 
-    qc.x([5,6])
     qc.x(7)
     qc.ccx(5, 6, 7)
-    qc.x([5,6])
+    qc.x([4,5,6])
 
+    qc.barrier()
     for i in range(6,3, -1):
         rev_counter(qc, i)
 
 
 def diffusion(qc):
+    qc.barrier()
     qc.h([4, 5, 6])
     qc.x([4, 5, 6])
     qc.ccz(4, 5, 6)
     qc.x([4, 5, 6])
     qc.h([4, 5, 6])
-
+    qc.barrier()
 
 qc.x(10)
 qc.h(10)
 
 qc.h([4,5,6])
 
-n = 3                # number of qubits
-N = pow(2, n)        # total solution space size = 8
-M = 2                # number of marked/target states
-iterations = floor((pi/4) * sqrt(N/M))
+n = 3 # Num of vertices
+k = 2 # Num of used vertices in vertex cover
+N = pow(2, n) # number of possible inputs
+M = comb(n, k) # over approximate the number of solutions to avoid overshooting the number of iterations
+print(f"N: {N}, M: {M}")
+# M = 2
+iterations = floor(pi / 4 * sqrt(N / M))
 print("Iterations: ", iterations)
 
 for i in range(iterations):
@@ -119,7 +117,7 @@ qc.x(10)
 qc.measure([4,5,6], [0,1,2])
 
 fig = qc.draw('mpl')
-fig.savefig('circuit.png', dpi=150, bbox_inches="tight")
+fig.savefig('circuit_ver.png', dpi=150, bbox_inches="tight")
 
 #qc = qiskit.qasm3.load("vertex_cover.qasm")
 

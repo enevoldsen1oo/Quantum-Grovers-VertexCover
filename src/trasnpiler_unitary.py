@@ -1,4 +1,4 @@
-from qiskit import QuantumCircuit
+from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 from problem import VertexCoverProblem
 import math
 import numpy as np
@@ -116,7 +116,13 @@ class VCPToCircuitTranspilerUnitary:
             qc.h(i)
 
     def transpile(self) -> QuantumCircuit:
-        qc = QuantumCircuit(self.num_qubits, self.num_vertices) 
+        ver = QuantumRegister(3, "ver")
+        count = QuantumRegister(2, "count")
+        edge = QuantumRegister(3, "edge")
+        sol = QuantumRegister(1, "s")
+        clas = ClassicalRegister(3)
+        
+        qc = QuantumCircuit(ver, count, edge, sol, clas) 
         qc.h(range(self.num_vertices)) # superposition of all vertex subsets
         
         # Prepare phase kickback qubit
@@ -145,9 +151,9 @@ if __name__ == "__main__":
     import qiskit.qasm3
     from problem import Graph
     
-    # graph = Graph(vertices=[0,1,2], edges=[(0,1), (0,2), (1,2)])
+    graph = Graph(vertices=[0,1,2], edges=[(0,1), (0,2), (1,2)])
     #graph = Graph(vertices=[0,1,2,3,4,5], edges=[(0,1), (0,2), (1,2), (1,3), (1,4), (1,5)])
-    graph = Graph(vertices=[0,1,2,3,4], edges=[(0,1), (0,2), (1,2), (1,3), (1,4)])
+    #graph = Graph(vertices=[0,1,2,3,4], edges=[(0,1), (0,2), (1,2), (1,3), (1,4)])
     # graph = Graph(vertices=[0,1,2,3], edges=[(0,1), (0,2), (1,2), (1,3)])
     # graph = Graph(vertices=[0,1,2,3,4], edges=[(0,1), (0,2), (1,2), (1,3), (3,4)])
     problem = VertexCoverProblem(graph=graph, k=2)
@@ -155,9 +161,13 @@ if __name__ == "__main__":
     transpiler = VCPToCircuitTranspilerUnitary(problem)
     qc = transpiler.transpile()
     
+    fig = qc.draw('mpl')
+    fig.savefig('circuit_uni.png', dpi=150, bbox_inches="tight")
+
     print(qc)
     service = QiskitRuntimeService(channel="ibm_quantum_platform")
     backend = service.backend("ibm_fez")
+    #noise_model = NoiseModel.from_backend(backend=backend)
     sim = AerSimulator()
 
     tqc = transpile(qc, backend=sim, optimization_level=3)

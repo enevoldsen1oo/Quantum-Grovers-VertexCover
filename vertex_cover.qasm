@@ -157,11 +157,7 @@ h q[10];
 // Uniform superposition over the 3 vertexes
 h q[4]; h q[5]; h q[6];
 
-// Grover iterations: optimal k = 4 for N=32, M=1  (success prob ~99.9%)
-oracle q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8], q[9], q[10];
-diffusion q[4], q[5], q[6];
-oracle q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8], q[9], q[10];
-diffusion q[4], q[5], q[6];
+// Grover iterations: 1
 oracle q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8], q[9], q[10];
 diffusion q[4], q[5], q[6];
 
@@ -170,7 +166,7 @@ diffusion q[4], q[5], q[6];
 h q[10];
 x q[10];
 
-// Measure edge qubits -> expect |11011> (e1,e2,e4,e5 = Hamiltonian cycle)
+// Measure vertice qubits (Expected |011> |101> |110>) 
 c[0] = measure q[4];
 c[1] = measure q[5];
 c[2] = measure q[6];
