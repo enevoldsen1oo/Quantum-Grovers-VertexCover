@@ -161,9 +161,9 @@ h q[4]; h q[5]; h q[6];
 oracle q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8], q[9], q[10];
 diffusion q[4], q[5], q[6];
 oracle q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8], q[9], q[10];
-diffusion q[0], q[1], q[2];
+diffusion q[4], q[5], q[6];
 oracle q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8], q[9], q[10];
-diffusion q[0], q[1], q[2];
+diffusion q[4], q[5], q[6];
 
 
 // Restore phase qubit
