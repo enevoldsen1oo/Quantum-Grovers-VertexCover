@@ -1,7 +1,6 @@
 from qiskit import QuantumCircuit
-import math
 from qiskit.circuit.library import MCXGate
-
+import math
 
 class VCPQuantumCircuitBuilder:
     def __init__(self, k: int, vertices: list[int], edges: list[tuple[int, int]]):
@@ -167,17 +166,12 @@ class VCPQuantumCircuitBuilder:
 
 if __name__ == "__main__":
     from matplotlib import pyplot as plt
-    from qiskit import QuantumCircuit, transpile
+    from qiskit import transpile
     from qiskit_ibm_runtime import QiskitRuntimeService, Session, SamplerV2
     from qiskit_aer import AerSimulator
     from qiskit_aer.noise import NoiseModel
-    from qiskit.circuit.library import C3XGate, MCXGate
     from qiskit.visualization import plot_histogram
-    import qiskit.qasm3
-    from problem import Graph
     from qiskit_ibm_runtime.fake_provider import FakeFez
-    import os
-
 
 
     # builder = VCPQuantumCircuitBuilder(k=2, vertices=[0,1,2], edges=[(0,1), (0,2), (1,2)])
